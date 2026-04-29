@@ -53,6 +53,7 @@ modelInput.addEventListener('change', async () => {
   setStatus(`Loading ${file.name}…`);
   try {
     state.model = await loadModelFromFile(file, sceneCtx);
+    state.modelFilename = file.name;
     clearDecal(state, sceneCtx.modelGroup);
     setStepActive(state.decalTexture ? 4 : 2);
     setStatus(
@@ -172,15 +173,22 @@ redoBtn.addEventListener('click', () => {
 
 saveBtn.addEventListener('click', async () => {
   if (!state.model) return;
-  setStatus('Exporting GLB…');
+  const filename = buildExportFilename(state.modelFilename);
+  setStatus(`Exporting ${filename}…`);
   try {
-    await exportGLB(state.model, state.decalMesh);
-    setStatus('Saved model_with_decal.glb');
+    await exportGLB(state.model, state.decalMesh, filename);
+    setStatus(`Saved ${filename}`);
   } catch (err) {
     console.error(err);
     setStatus(`Failed to save GLB: ${(err as Error).message}`, 'error');
   }
 });
+
+function buildExportFilename(modelFilename: string | null): string {
+  if (!modelFilename) return 'model_with_decal.glb';
+  const base = modelFilename.replace(/\.(glb|gltf)$/i, '');
+  return `${base}_with_decal.glb`;
+}
 
 function setSize(size: number): void {
   const clamped = clamp(size, SIZE_MIN, SIZE_MAX);

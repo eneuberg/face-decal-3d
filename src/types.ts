@@ -13,6 +13,8 @@ export interface DecalPlacement {
 
 export interface AppState {
   model: LoadedModel | null;
+  /** Original filename of the loaded model, used to derive the export name. */
+  modelFilename: string | null;
   decalTexture: THREE.CanvasTexture | null;
   decalMesh: THREE.Mesh | null;
   decalPlacement: DecalPlacement | null;
@@ -27,6 +29,7 @@ export interface AppState {
 export function createInitialState(): AppState {
   return {
     model: null,
+    modelFilename: null,
     decalTexture: null,
     decalMesh: null,
     decalPlacement: null,
