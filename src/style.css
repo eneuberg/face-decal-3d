@@ -293,3 +293,29 @@ button.primary:hover:not(:disabled) {
   gap: 10px;
   justify-content: flex-end;
 }
+
+.crop-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.crop-toolbar button.mode {
+  padding: 6px 10px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.crop-toolbar button.mode.active {
+  background: var(--accent);
+  color: #0a0a0a;
+  border-color: var(--accent);
+}
+
+.crop-hint {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+}

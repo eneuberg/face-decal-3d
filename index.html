@@ -85,6 +85,11 @@
 
     <div id="crop-modal" class="hidden" aria-hidden="true">
       <div class="crop-container">
+        <div class="crop-toolbar">
+          <button id="crop-mode-rect" class="mode active">Rectangle</button>
+          <button id="crop-mode-lasso" class="mode">Lasso</button>
+          <span class="crop-hint" id="crop-hint">Drag corners to resize, drag inside to move.</span>
+        </div>
         <div class="crop-stage">
           <canvas id="crop-canvas"></canvas>
         </div>

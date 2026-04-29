@@ -1,5 +1,10 @@
 import { getRequiredEl } from './ui';
 
+interface Point {
+  x: number;
+  y: number;
+}
+
 interface Rect {
   x: number;
   y: number;
@@ -7,29 +12,42 @@ interface Rect {
   h: number;
 }
 
+type CropMode = 'rect' | 'lasso';
+
 type DragMode =
   | { kind: 'none' }
   | { kind: 'move'; startX: number; startY: number; rect: Rect }
-  | {
-      kind: 'resize';
-      corner: 'nw' | 'ne' | 'sw' | 'se';
-      rect: Rect;
-    };
+  | { kind: 'resize'; corner: 'nw' | 'ne' | 'sw' | 'se'; rect: Rect }
+  | { kind: 'lasso' };
 
 const HANDLE_SIZE = 10;
+const LASSO_MIN_DIST_SQ = 4 * 4;
+const LASSO_MIN_POINTS = 3;
+
+const RECT_HINT = 'Drag corners to resize, drag inside to move.';
+const LASSO_HINT = 'Drag to draw a freehand outline. Release to close the shape.';
 
 export class Cropper {
   private modal = getRequiredEl<HTMLDivElement>('crop-modal');
   private canvas = getRequiredEl<HTMLCanvasElement>('crop-canvas');
   private confirmBtn = getRequiredEl<HTMLButtonElement>('crop-confirm');
   private cancelBtn = getRequiredEl<HTMLButtonElement>('crop-cancel');
+  private rectModeBtn = getRequiredEl<HTMLButtonElement>('crop-mode-rect');
+  private lassoModeBtn = getRequiredEl<HTMLButtonElement>('crop-mode-lasso');
+  private hintEl = getRequiredEl<HTMLSpanElement>('crop-hint');
 
   private ctx: CanvasRenderingContext2D;
   private image: HTMLImageElement | null = null;
-  /** Rect in canvas (display) coordinates. */
-  private rect: Rect = { x: 0, y: 0, w: 0, h: 0 };
-  private drag: DragMode = { kind: 'none' };
+  private mode: CropMode = 'rect';
 
+  /** Rectangle in canvas (display) coordinates. */
+  private rect: Rect = { x: 0, y: 0, w: 0, h: 0 };
+
+  /** Lasso polygon in canvas (display) coordinates. */
+  private lasso: Point[] = [];
+  private lassoClosed = false;
+
+  private drag: DragMode = { kind: 'none' };
   private resolveFn: ((value: HTMLCanvasElement | null) => void) | null = null;
 
   constructor() {
@@ -39,6 +57,9 @@ export class Cropper {
 
     this.confirmBtn.addEventListener('click', () => this.confirm());
     this.cancelBtn.addEventListener('click', () => this.cancel());
+    this.rectModeBtn.addEventListener('click', () => this.setMode('rect'));
+    this.lassoModeBtn.addEventListener('click', () => this.setMode('lasso'));
+
     this.canvas.addEventListener('mousedown', (e) => this.onDown(e));
     window.addEventListener('mousemove', (e) => this.onMove(e));
     window.addEventListener('mouseup', () => this.onUp());
@@ -56,15 +77,10 @@ export class Cropper {
     this.canvas.width = Math.round(image.width * scale);
     this.canvas.height = Math.round(image.height * scale);
 
-    // Default crop: centered square at 80% of shorter side.
-    const shorter = Math.min(this.canvas.width, this.canvas.height);
-    const side = shorter * 0.8;
-    this.rect = {
-      x: (this.canvas.width - side) / 2,
-      y: (this.canvas.height - side) / 2,
-      w: side,
-      h: side,
-    };
+    this.resetRect();
+    this.lasso = [];
+    this.lassoClosed = false;
+    this.setMode('rect');
 
     this.modal.classList.remove('hidden');
     this.modal.setAttribute('aria-hidden', 'false');
@@ -75,33 +91,43 @@ export class Cropper {
     });
   }
 
+  private setMode(mode: CropMode): void {
+    this.mode = mode;
+    this.rectModeBtn.classList.toggle('active', mode === 'rect');
+    this.lassoModeBtn.classList.toggle('active', mode === 'lasso');
+    this.hintEl.textContent = mode === 'rect' ? RECT_HINT : LASSO_HINT;
+    this.drag = { kind: 'none' };
+    if (mode === 'lasso') {
+      // Start fresh each time the user enters lasso mode.
+      this.lasso = [];
+      this.lassoClosed = false;
+    }
+    this.draw();
+  }
+
+  private resetRect(): void {
+    if (!this.image) return;
+    const shorter = Math.min(this.canvas.width, this.canvas.height);
+    const side = shorter * 0.8;
+    this.rect = {
+      x: (this.canvas.width - side) / 2,
+      y: (this.canvas.height - side) / 2,
+      w: side,
+      h: side,
+    };
+  }
+
   private confirm(): void {
     if (!this.image) {
       this.close(null);
       return;
     }
-    // Map canvas-space rect → image-space rect.
-    const sx = this.image.width / this.canvas.width;
-    const sy = this.image.height / this.canvas.height;
-    const out = document.createElement('canvas');
-    out.width = Math.max(1, Math.round(this.rect.w * sx));
-    out.height = Math.max(1, Math.round(this.rect.h * sy));
-    const octx = out.getContext('2d');
-    if (!octx) {
-      this.close(null);
+    const out =
+      this.mode === 'rect' ? this.exportRect() : this.exportLasso();
+    if (!out) {
+      // Lasso with too few points or other failure — keep the modal open.
       return;
     }
-    octx.drawImage(
-      this.image,
-      this.rect.x * sx,
-      this.rect.y * sy,
-      this.rect.w * sx,
-      this.rect.h * sy,
-      0,
-      0,
-      out.width,
-      out.height,
-    );
     this.close(out);
   }
 
@@ -117,6 +143,66 @@ export class Cropper {
     if (fn) fn(value);
   }
 
+  // -------- Export --------
+
+  private exportRect(): HTMLCanvasElement | null {
+    if (!this.image) return null;
+    const sx = this.image.width / this.canvas.width;
+    const sy = this.image.height / this.canvas.height;
+    const out = document.createElement('canvas');
+    out.width = Math.max(1, Math.round(this.rect.w * sx));
+    out.height = Math.max(1, Math.round(this.rect.h * sy));
+    const octx = out.getContext('2d');
+    if (!octx) return null;
+    octx.drawImage(
+      this.image,
+      this.rect.x * sx,
+      this.rect.y * sy,
+      this.rect.w * sx,
+      this.rect.h * sy,
+      0,
+      0,
+      out.width,
+      out.height,
+    );
+    return out;
+  }
+
+  private exportLasso(): HTMLCanvasElement | null {
+    if (!this.image || this.lasso.length < LASSO_MIN_POINTS) return null;
+
+    const sx = this.image.width / this.canvas.width;
+    const sy = this.image.height / this.canvas.height;
+
+    // Polygon in image space.
+    const poly = this.lasso.map((p) => ({ x: p.x * sx, y: p.y * sy }));
+    const bbox = polygonBounds(poly);
+    if (bbox.w < 1 || bbox.h < 1) return null;
+
+    const out = document.createElement('canvas');
+    out.width = Math.max(1, Math.round(bbox.w));
+    out.height = Math.max(1, Math.round(bbox.h));
+    const octx = out.getContext('2d');
+    if (!octx) return null;
+
+    // Clip to the polygon (translated so bbox top-left is at 0,0), then draw the image.
+    octx.save();
+    octx.beginPath();
+    poly.forEach((p, i) => {
+      const x = p.x - bbox.x;
+      const y = p.y - bbox.y;
+      if (i === 0) octx.moveTo(x, y);
+      else octx.lineTo(x, y);
+    });
+    octx.closePath();
+    octx.clip();
+    octx.drawImage(this.image, -bbox.x, -bbox.y);
+    octx.restore();
+    return out;
+  }
+
+  // -------- Drawing --------
+
   private draw(): void {
     if (!this.image) return;
     const { ctx, canvas } = this;
@@ -124,21 +210,25 @@ export class Cropper {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(this.image, 0, 0, canvas.width, canvas.height);
 
-    // Dim everything outside the crop rectangle.
+    if (this.mode === 'rect') this.drawRect();
+    else this.drawLasso();
+  }
+
+  private drawRect(): void {
+    const { ctx } = this;
+    // Dim outside the rect.
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
     ctx.beginPath();
-    ctx.rect(0, 0, canvas.width, canvas.height);
+    ctx.rect(0, 0, this.canvas.width, this.canvas.height);
     ctx.rect(this.rect.x + this.rect.w, this.rect.y, -this.rect.w, this.rect.h);
     ctx.fill('evenodd');
     ctx.restore();
 
-    // Crop border.
     ctx.strokeStyle = '#f0a040';
     ctx.lineWidth = 1;
     ctx.strokeRect(this.rect.x + 0.5, this.rect.y + 0.5, this.rect.w, this.rect.h);
 
-    // Corner handles.
     ctx.fillStyle = '#f0a040';
     for (const c of corners(this.rect)) {
       ctx.fillRect(
@@ -150,21 +240,67 @@ export class Cropper {
     }
   }
 
+  private drawLasso(): void {
+    const { ctx } = this;
+    if (this.lasso.length === 0) return;
+
+    // If closed, dim everything outside the polygon. While drawing, just show the path.
+    if (this.lassoClosed) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.beginPath();
+      ctx.rect(0, 0, this.canvas.width, this.canvas.height);
+      this.lasso.forEach((p, i) => {
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      });
+      ctx.closePath();
+      ctx.fill('evenodd');
+      ctx.restore();
+    }
+
+    ctx.strokeStyle = '#f0a040';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    this.lasso.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    if (this.lassoClosed) ctx.closePath();
+    ctx.stroke();
+  }
+
+  // -------- Input --------
+
   private onDown(e: MouseEvent): void {
     const { x, y } = this.localXY(e);
-    const corner = hitCorner(x, y, this.rect);
-    if (corner) {
-      this.drag = { kind: 'resize', corner, rect: { ...this.rect } };
-      return;
-    }
-    if (insideRect(x, y, this.rect)) {
-      this.drag = { kind: 'move', startX: x, startY: y, rect: { ...this.rect } };
+    if (this.mode === 'rect') {
+      const corner = hitCorner(x, y, this.rect);
+      if (corner) {
+        this.drag = { kind: 'resize', corner, rect: { ...this.rect } };
+        return;
+      }
+      if (insideRect(x, y, this.rect)) {
+        this.drag = {
+          kind: 'move',
+          startX: x,
+          startY: y,
+          rect: { ...this.rect },
+        };
+      }
+    } else {
+      // Lasso: starting a new outline replaces any previous one.
+      this.lasso = [{ x, y }];
+      this.lassoClosed = false;
+      this.drag = { kind: 'lasso' };
+      this.draw();
     }
   }
 
   private onMove(e: MouseEvent): void {
     if (this.drag.kind === 'none') return;
     const { x, y } = this.localXY(e);
+
     if (this.drag.kind === 'move') {
       const dx = x - this.drag.startX;
       const dy = y - this.drag.startY;
@@ -187,15 +323,27 @@ export class Cropper {
         this.canvas.width,
         this.canvas.height,
       );
+    } else if (this.drag.kind === 'lasso') {
+      const last = this.lasso[this.lasso.length - 1];
+      if (!last || (x - last.x) ** 2 + (y - last.y) ** 2 >= LASSO_MIN_DIST_SQ) {
+        this.lasso.push({
+          x: clamp(x, 0, this.canvas.width),
+          y: clamp(y, 0, this.canvas.height),
+        });
+      }
     }
     this.draw();
   }
 
   private onUp(): void {
+    if (this.drag.kind === 'lasso') {
+      this.lassoClosed = this.lasso.length >= LASSO_MIN_POINTS;
+      this.draw();
+    }
     this.drag = { kind: 'none' };
   }
 
-  private localXY(e: MouseEvent): { x: number; y: number } {
+  private localXY(e: MouseEvent): Point {
     const rect = this.canvas.getBoundingClientRect();
     const sx = this.canvas.width / rect.width;
     const sy = this.canvas.height / rect.height;
@@ -205,6 +353,8 @@ export class Cropper {
     };
   }
 }
+
+// -------- Helpers --------
 
 function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -222,7 +372,7 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   });
 }
 
-function corners(r: Rect): Array<{ x: number; y: number }> {
+function corners(r: Rect): Point[] {
   return [
     { x: r.x, y: r.y },
     { x: r.x + r.w, y: r.y },
@@ -261,8 +411,8 @@ function resizeFromCorner(
   maxH: number,
 ): Rect {
   const minSize = 10;
-  const cx = Math.max(0, Math.min(x, maxW));
-  const cy = Math.max(0, Math.min(y, maxH));
+  const cx = clamp(x, 0, maxW);
+  const cy = clamp(y, 0, maxH);
 
   let left = start.x;
   let top = start.y;
@@ -284,4 +434,22 @@ function resizeFromCorner(
   }
 
   return { x: left, y: top, w: right - left, h: bottom - top };
+}
+
+function polygonBounds(points: Point[]): Rect {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const p of points) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, v));
 }

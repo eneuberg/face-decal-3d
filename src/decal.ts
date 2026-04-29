@@ -95,7 +95,6 @@ function disposeMaterial(mat: THREE.Material | THREE.Material[]): void {
   else mat.dispose();
 }
 
-// TODO: Lasso crop — allow freehand polygon selection for irregular face cutouts
 // TODO: Multiple decals — track an array of placed decals, allow selecting/deleting individual ones
 // TODO: Bake decal into UV texture — render to WebGLRenderTarget and export as a single-material mesh
 // TODO: Decal rotation handle — let user rotate the decal around the surface normal

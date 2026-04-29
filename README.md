@@ -7,7 +7,7 @@ Built with **Vite + TypeScript (strict)** and **Three.js** (`DecalGeometry`, `GL
 ## What it does
 
 1. Load a `.glb` / `.gltf` head scan
-2. Upload a face photo (`.png` / `.jpg` / `.webp`) and crop it
+2. Upload a face photo (`.png` / `.jpg` / `.webp`) and crop it — **rectangle** (drag corners) or **lasso** (drag a freehand outline; pixels outside become transparent)
 3. Click on the model — the cropped image is projected onto the surface from the current camera angle as a `DecalGeometry` mesh
 4. Adjust the size with the slider or **Shift + scroll** for live re-projection (Photoshop-brush style)
 5. Save the combined model + decal as a single binary GLB
@@ -43,7 +43,7 @@ Open the URL Vite prints (typically `http://localhost:5173`).
 src/
   main.ts        DOM event wiring + AppState orchestration
   scene.ts       Three.js scene, camera, OrbitControls, GLTF loading, camera fit
-  cropper.ts     Modal crop overlay (canvas-based, draggable rectangle with corner handles)
+  cropper.ts     Modal crop overlay — rectangle (corner-handle resize) and lasso (freehand polygon clipped to alpha)
   decal.ts       placeDecalAtPointer / resizeDecal / clearDecal — caches the placement so resize doesn't re-raycast
   exporter.ts    Wraps GLTFExporter; reparents model + decal under a temp group for clean export
   ui.ts          DOM helpers (status messages, step highlight, required-element lookup)
@@ -57,7 +57,6 @@ State lives on a single `AppState` object owned by `main.ts`. All consumers are 
 
 Marked as `TODO` in `src/decal.ts`:
 
-- Lasso crop for irregular cutouts
 - Multiple decals at once with selection / deletion
 - Bake the decal into the base UV texture and export as a single-material mesh
 - Rotation handle to spin the decal around the surface normal
