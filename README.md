@@ -55,7 +55,16 @@ State lives on a single `AppState` object owned by `main.ts`. All consumers are 
 
 ## Future ideas
 
-Marked as `TODO` in `src/decal.ts`:
+Planned (not yet implemented):
+
+- **Re-crop in place mode.** Once a decal is placed, allow re-opening the crop modal on the *original* uploaded image to iterate on the crop without re-uploading. Requires keeping the source image around (currently we only keep the cropped canvas / texture).
+- **Brightness & saturation sliders.** Color-correct the decal image after cropping. Either CSS-style filter on a working canvas or pixel-wise transform; result is rebaked into the `CanvasTexture` so the live decal updates.
+- **Magic skin selection.** A one-click selection that captures skin *and everything inside the skin region* (eyes, mouth, teeth, etc.) — i.e. the head/face mask, with hair and clothing acting as the outer separator. Likely a face-segmentation model (MediaPipe / BodyPix style) producing an alpha mask the texture is multiplied by.
+- **Refine selection with lasso / rectangle + hotkeys.** Photoshop-style modifier keys: **Shift** to add to the active selection, **Alt** to subtract. Works with both shape tools on top of whatever the magic-select returned.
+- **Ctrl + wheel zoom in the crop modal.** Zoom into the image inside the crop overlay for fine-detail crops. Pan with drag while zoomed.
+- **Flat sticker mode (no surface conform).** A checkbox to opt out of `DecalGeometry` projection: instead, place a flat textured plane on the model surface, anchored at the raycast hit point and oriented to face the camera. Useful when the surface is too irregular for the projection to look clean.
+
+Smaller cleanups (also `TODO`s in `src/decal.ts`):
 
 - Multiple decals at once with selection / deletion
 - Bake the decal into the base UV texture and export as a single-material mesh
