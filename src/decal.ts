@@ -3,6 +3,14 @@ import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js';
 import type { AppState, DecalPlacement } from './types';
 
 /**
+ * Distance along each vertex normal to push the decal off the underlying
+ * surface. polygonOffset isn't preserved by GLTFExporter, so we bake the
+ * offset into the geometry to avoid z-fighting in glTF viewers. Tiny —
+ * imperceptible visually — but enough to win the depth test reliably.
+ */
+const SURFACE_OFFSET = 0.001;
+
+/**
  * Project a decal onto the model from the current camera angle.
  * Returns true if a hit was found and the decal was placed.
  */
@@ -70,14 +78,18 @@ function applyDecal(
     placement.orientation,
     sizeVec,
   );
+  offsetAlongNormals(geometry, SURFACE_OFFSET);
 
+  // alphaTest (not transparent) gives a clean cutout in both the live render
+  // AND the exported glTF: the exporter writes alphaMode='MASK', so transparent
+  // fragments are discarded — no depth write, no blending. Plain transparent
+  // materials export as alphaMode='BLEND', and because glTF has no equivalent
+  // for depthWrite=false the decal then occludes the model wherever its
+  // texture is transparent — that's the "white card over the face" bug.
   const material = new THREE.MeshBasicMaterial({
     map: state.decalTexture,
-    transparent: true,
-    depthTest: true,
-    depthWrite: false,
-    polygonOffset: true,
-    polygonOffsetFactor: -4,
+    alphaTest: 0.5,
+    transparent: false,
   });
 
   const mesh = new THREE.Mesh(geometry, material);
@@ -96,6 +108,21 @@ function applyDecal(
 function disposeMaterial(mat: THREE.Material | THREE.Material[]): void {
   if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
   else mat.dispose();
+}
+
+/** Push every vertex along its normal by `offset` world units. */
+function offsetAlongNormals(geom: THREE.BufferGeometry, offset: number): void {
+  const positions = geom.getAttribute('position') as THREE.BufferAttribute;
+  const normals = geom.getAttribute('normal') as THREE.BufferAttribute;
+  for (let i = 0; i < positions.count; i++) {
+    positions.setXYZ(
+      i,
+      positions.getX(i) + normals.getX(i) * offset,
+      positions.getY(i) + normals.getY(i) * offset,
+      positions.getZ(i) + normals.getZ(i) * offset,
+    );
+  }
+  positions.needsUpdate = true;
 }
 
 // TODO: Multiple decals — track an array of placed decals, allow selecting/deleting individual ones
