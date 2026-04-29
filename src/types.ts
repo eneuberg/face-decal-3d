@@ -16,7 +16,12 @@ export interface AppState {
   decalTexture: THREE.CanvasTexture | null;
   decalMesh: THREE.Mesh | null;
   decalPlacement: DecalPlacement | null;
+  /** Uniform base size in world units (edge of the projection cube). */
   decalSize: number;
+  /** Multiplier on the projection box's X axis (camera-aligned width). */
+  decalStretchX: number;
+  /** Multiplier on the projection box's Y axis (camera-aligned height). */
+  decalStretchY: number;
 }
 
 export function createInitialState(): AppState {
@@ -26,5 +31,7 @@ export function createInitialState(): AppState {
     decalMesh: null,
     decalPlacement: null,
     decalSize: 0.15,
+    decalStretchX: 1.0,
+    decalStretchY: 1.0,
   };
 }

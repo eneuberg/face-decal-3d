@@ -9,7 +9,7 @@ Built with **Vite + TypeScript (strict)** and **Three.js** (`DecalGeometry`, `GL
 1. Load a `.glb` / `.gltf` head scan
 2. Upload a face photo (`.png` / `.jpg` / `.webp`) and crop it — **rectangle** (drag corners) or **lasso** (drag a freehand outline; pixels outside become transparent)
 3. Click on the model — the cropped image is projected onto the surface from the current camera angle as a `DecalGeometry` mesh
-4. Adjust the size with the slider or **Shift + scroll** for live re-projection (Photoshop-brush style)
+4. Adjust the size with the slider or **Shift + scroll** for live re-projection (Photoshop-brush style); two extra **Stretch X / Stretch Y** sliders scale the decal independently along the camera-aligned axes
 5. Save the combined model + decal as a single binary GLB
 
 ## Quick start

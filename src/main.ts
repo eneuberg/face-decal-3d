@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import './style.css';
 import { Cropper } from './cropper';
-import { clearDecal, placeDecalAtPointer, resizeDecal } from './decal';
+import { clearDecal, placeDecalAtPointer, rebuildDecal } from './decal';
 import { exportGLB } from './exporter';
 import { createScene, loadModelFromFile } from './scene';
 import { createInitialState } from './types';
@@ -9,6 +9,8 @@ import { getRequiredEl, setStatus, setStepActive } from './ui';
 
 const SIZE_MIN = 0.01;
 const SIZE_MAX = 1.0;
+const STRETCH_MIN = 0.25;
+const STRETCH_MAX = 4.0;
 const WHEEL_FACTOR = 0.0015; // sensitivity for Shift+wheel resize
 
 const state = createInitialState();
@@ -20,6 +22,10 @@ const modelInput = getRequiredEl<HTMLInputElement>('model-input');
 const imageInput = getRequiredEl<HTMLInputElement>('image-input');
 const sizeSlider = getRequiredEl<HTMLInputElement>('size-slider');
 const sizeValue = getRequiredEl<HTMLSpanElement>('size-value');
+const stretchXSlider = getRequiredEl<HTMLInputElement>('stretch-x-slider');
+const stretchXValue = getRequiredEl<HTMLSpanElement>('stretch-x-value');
+const stretchYSlider = getRequiredEl<HTMLInputElement>('stretch-y-slider');
+const stretchYValue = getRequiredEl<HTMLSpanElement>('stretch-y-value');
 const redoBtn = getRequiredEl<HTMLButtonElement>('redo-projection');
 const saveBtn = getRequiredEl<HTMLButtonElement>('save-btn');
 
@@ -133,6 +139,16 @@ sizeSlider.addEventListener('input', () => {
   if (Number.isFinite(v)) setSize(v);
 });
 
+stretchXSlider.addEventListener('input', () => {
+  const v = parseFloat(stretchXSlider.value);
+  if (Number.isFinite(v)) setStretchX(v);
+});
+
+stretchYSlider.addEventListener('input', () => {
+  const v = parseFloat(stretchYSlider.value);
+  if (Number.isFinite(v)) setStretchY(v);
+});
+
 redoBtn.addEventListener('click', () => {
   clearDecal(state, sceneCtx.modelGroup);
   redoBtn.disabled = true;
@@ -158,7 +174,23 @@ function setSize(size: number): void {
   state.decalSize = clamped;
   sizeSlider.value = clamped.toFixed(2);
   sizeValue.textContent = clamped.toFixed(2);
-  resizeDecal(state, sceneCtx.modelGroup, clamped);
+  rebuildDecal(state, sceneCtx.modelGroup);
+}
+
+function setStretchX(v: number): void {
+  const clamped = clamp(v, STRETCH_MIN, STRETCH_MAX);
+  state.decalStretchX = clamped;
+  stretchXSlider.value = clamped.toFixed(2);
+  stretchXValue.textContent = clamped.toFixed(2);
+  rebuildDecal(state, sceneCtx.modelGroup);
+}
+
+function setStretchY(v: number): void {
+  const clamped = clamp(v, STRETCH_MIN, STRETCH_MAX);
+  state.decalStretchY = clamped;
+  stretchYSlider.value = clamped.toFixed(2);
+  stretchYValue.textContent = clamped.toFixed(2);
+  rebuildDecal(state, sceneCtx.modelGroup);
 }
 
 function updateButtons(): void {

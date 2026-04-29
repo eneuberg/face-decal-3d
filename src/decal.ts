@@ -29,16 +29,15 @@ export function placeDecalAtPointer(
     targetMesh: hit.object as THREE.Mesh,
   };
 
-  applyDecal(state, parent, placement, state.decalSize);
+  applyDecal(state, parent, placement);
   state.decalPlacement = placement;
   return true;
 }
 
-/** Rebuild the decal at the cached placement with a new size. No-op if no placement. */
-export function resizeDecal(state: AppState, parent: THREE.Object3D, size: number): void {
-  state.decalSize = size;
+/** Rebuild the decal at the cached placement using the current size + stretch state. No-op if no placement. */
+export function rebuildDecal(state: AppState, parent: THREE.Object3D): void {
   if (!state.decalPlacement) return;
-  applyDecal(state, parent, state.decalPlacement, size);
+  applyDecal(state, parent, state.decalPlacement);
 }
 
 /** Remove the active decal. */
@@ -56,11 +55,15 @@ function applyDecal(
   state: AppState,
   parent: THREE.Object3D,
   placement: DecalPlacement,
-  size: number,
 ): void {
   if (!state.decalTexture) return;
 
-  const sizeVec = new THREE.Vector3(size, size, size);
+  const base = state.decalSize;
+  const sizeVec = new THREE.Vector3(
+    base * state.decalStretchX,
+    base * state.decalStretchY,
+    base,
+  );
   const geometry = new DecalGeometry(
     placement.targetMesh,
     placement.point,
