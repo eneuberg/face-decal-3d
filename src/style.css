@@ -247,6 +247,38 @@ button.primary:hover:not(:disabled) {
   cursor: crosshair;
 }
 
+#viewport-controls-hint {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: color-mix(in srgb, var(--panel) 85%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-dim);
+  pointer-events: none;
+  user-select: none;
+  z-index: 5;
+}
+
+#viewport-controls-hint dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2px 12px;
+}
+
+#viewport-controls-hint dt {
+  color: var(--text);
+}
+
+#viewport-controls-hint dd {
+  margin: 0;
+}
+
 #crop-modal {
   position: fixed;
   inset: 0;

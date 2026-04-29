@@ -126,7 +126,7 @@ export class Cropper {
     window.addEventListener('keyup', (e) => this.onKeyUp(e));
   }
 
-  private isOpen(): boolean {
+  isOpen(): boolean {
     return !this.modal.classList.contains('hidden');
   }
 

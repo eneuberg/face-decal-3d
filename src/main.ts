@@ -4,7 +4,7 @@ import { Cropper } from './cropper';
 import { clearDecal, placeDecalAtPointer, rebuildDecal } from './decal';
 import { exportGLB } from './exporter';
 import { createScene, loadModelFromFile } from './scene';
-import { createInitialState } from './types';
+import { createInitialState, type PlacementSnapshot } from './types';
 import { getRequiredEl, setStatus, setStepActive } from './ui';
 
 const SIZE_MIN = 0.01;
@@ -12,6 +12,7 @@ const SIZE_MAX = 1.0;
 const STRETCH_MIN = 0.25;
 const STRETCH_MAX = 4.0;
 const WHEEL_FACTOR = 0.0015; // sensitivity for Shift+wheel resize
+const HISTORY_LIMIT = 10;
 
 const state = createInitialState();
 
@@ -38,6 +39,28 @@ const cropper = new Cropper();
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Shift') sceneCtx.controls.enableZoom = false;
 });
+
+// Ctrl/Cmd + Z → revert decal to prior placement (ring buffer of 10).
+// Ignored while the crop modal is open — the cropper has its own Ctrl+Z.
+window.addEventListener('keydown', (e) => {
+  if (cropper.isOpen()) return;
+  if (!(e.ctrlKey || e.metaKey) || e.shiftKey) return;
+  if (e.key.toLowerCase() !== 'z') return;
+  if (!state.decalHistory.length) return;
+  e.preventDefault();
+  const snap = state.decalHistory.pop()!;
+  state.decalPlacement = {
+    point: snap.point,
+    orientation: snap.orientation,
+    targetMesh: snap.targetMesh,
+  };
+  setSize(snap.size);
+  setStretchX(snap.stretchX);
+  setStretchY(snap.stretchY);
+  // setStretchY ends with rebuildDecal, so the mesh reflects the restored placement.
+  setStatus('Reverted decal to previous position.');
+});
+
 window.addEventListener('keyup', (e) => {
   if (e.key === 'Shift') sceneCtx.controls.enableZoom = true;
 });
@@ -132,8 +155,10 @@ function applyCroppedTexture(cropped: HTMLCanvasElement): void {
   }
 }
 
-// Click on viewport canvas → place decal.
+// Ctrl + click on viewport canvas → place decal. The Ctrl modifier prevents
+// accidental placements while orbiting; matches the crop-modal idiom.
 sceneCtx.renderer.domElement.addEventListener('click', (e) => {
+  if (!e.ctrlKey) return;
   if (!state.model) {
     setStatus('Load a model first.', 'warn');
     return;
@@ -143,15 +168,21 @@ sceneCtx.renderer.domElement.addEventListener('click', (e) => {
     return;
   }
 
+  const priorSnapshot = snapshotCurrentPlacement();
+
   const ndc = pointerToNDC(e, sceneCtx.renderer.domElement);
   const placed = placeDecalAtPointer(state, ndc, sceneCtx.camera, sceneCtx.modelGroup);
   if (!placed) {
     setStatus('No surface under cursor — try clicking on the model.', 'warn');
     return;
   }
+  if (priorSnapshot) {
+    state.decalHistory.push(priorSnapshot);
+    if (state.decalHistory.length > HISTORY_LIMIT) state.decalHistory.shift();
+  }
   redoBtn.disabled = false;
   setStepActive(5);
-  setStatus('Decal placed. Adjust size, click again to move, or save.');
+  setStatus('Decal placed. Ctrl+click to move, Ctrl+Z to undo, or save.');
   updateButtons();
 });
 
@@ -240,6 +271,18 @@ function updateButtons(): void {
   saveBtn.disabled = !state.model;
   redoBtn.disabled = !state.decalMesh;
   recropBtn.disabled = !state.originalImageFile;
+}
+
+function snapshotCurrentPlacement(): PlacementSnapshot | null {
+  if (!state.decalPlacement) return null;
+  return {
+    point: state.decalPlacement.point.clone(),
+    orientation: state.decalPlacement.orientation.clone(),
+    targetMesh: state.decalPlacement.targetMesh,
+    size: state.decalSize,
+    stretchX: state.decalStretchX,
+    stretchY: state.decalStretchY,
+  };
 }
 
 function pointerToNDC(

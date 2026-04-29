@@ -8,9 +8,20 @@ Built with **Vite + TypeScript (strict)** and **Three.js** (`DecalGeometry`, `GL
 
 1. Load a `.glb` / `.gltf` head scan
 2. Upload a face photo (`.png` / `.jpg` / `.webp`) and crop it — drag a **rectangle** or **lasso**; hold **Shift** to add to the selection or **Alt** to subtract; **Ctrl+Z** undoes the last selection step (up to 10). Pixels outside the final selection become transparent. **Ctrl + scroll** zooms toward the cursor, **Space + drag** pans, double-click resets the view. **Re-crop Image** in step 4 reopens the modal on the original upload so you can iterate without re-projecting.
-3. Click on the model — the cropped image is projected onto the surface from the current camera angle as a `DecalGeometry` mesh
+3. **Ctrl + click** on the model — the cropped image is projected onto the surface from the current camera angle as a `DecalGeometry` mesh. The Ctrl modifier prevents accidental placements while orbiting. **Ctrl+Z** undoes the last placement (restores the prior position).
 4. Adjust the size with the slider or **Shift + scroll** for live re-projection (Photoshop-brush style); two extra **Stretch X / Stretch Y** sliders scale the decal independently along the camera-aligned axes
 5. Save the combined model + decal as a single binary GLB
+
+## Viewport controls (top-right overlay)
+
+A persistent help panel pinned to the top-right corner of the viewport summarizes the controls:
+
+- **Ctrl + click** — place / re-project decal
+- **Ctrl + Z** — undo last decal position
+- **Shift + scroll** — size scaling of decal (live)
+- **Drag** — orbit (Three.js OrbitControls)
+- **Right-drag** — pan
+- **Mouse wheel** — zoom
 
 ## Quick start
 

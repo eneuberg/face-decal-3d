@@ -11,6 +11,16 @@ export interface DecalPlacement {
   targetMesh: THREE.Mesh;
 }
 
+/** Captured state needed to fully restore a prior decal placement via undo. */
+export interface PlacementSnapshot {
+  point: THREE.Vector3;
+  orientation: THREE.Euler;
+  targetMesh: THREE.Mesh;
+  size: number;
+  stretchX: number;
+  stretchY: number;
+}
+
 export interface AppState {
   model: LoadedModel | null;
   /** Original filename of the loaded model, used to derive the export name. */
@@ -26,6 +36,8 @@ export interface AppState {
   decalStretchX: number;
   /** Multiplier on the projection box's Y axis (camera-aligned height). */
   decalStretchY: number;
+  /** Ring buffer of prior placements, oldest-first. Capped at 10 entries. */
+  decalHistory: PlacementSnapshot[];
 }
 
 export function createInitialState(): AppState {
@@ -39,5 +51,6 @@ export function createInitialState(): AppState {
     decalSize: 0.15,
     decalStretchX: 1.0,
     decalStretchY: 1.0,
+    decalHistory: [],
   };
 }

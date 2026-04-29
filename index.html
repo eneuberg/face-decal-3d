@@ -107,7 +107,18 @@
         <div id="status" role="status" aria-live="polite"></div>
       </aside>
 
-      <main id="viewport"></main>
+      <main id="viewport">
+        <aside id="viewport-controls-hint" aria-label="Viewport controls">
+          <dl>
+            <dt>Ctrl + click</dt><dd>place / re-project</dd>
+            <dt>Ctrl + Z</dt><dd>undo last position</dd>
+            <dt>Shift + scroll</dt><dd>resize decal</dd>
+            <dt>Drag</dt><dd>orbit</dd>
+            <dt>Right-drag</dt><dd>pan</dd>
+            <dt>Wheel</dt><dd>zoom</dd>
+          </dl>
+        </aside>
+      </main>
     </div>
 
     <div id="crop-modal" class="hidden" aria-hidden="true">
