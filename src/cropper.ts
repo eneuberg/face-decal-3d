@@ -22,8 +22,13 @@ type ActiveShape =
 const LASSO_MIN_DIST_SQ = 4 * 4;
 const LASSO_MIN_POINTS = 3;
 
-const RECT_HINT = 'Drag a rectangle. Shift = add, Alt = subtract.';
-const LASSO_HINT = 'Drag a freehand outline. Shift = add, Alt = subtract.';
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 8;
+const ZOOM_FACTOR = 1.15;
+
+const VIEW_HINT = 'Ctrl+scroll = zoom, Space+drag = pan, double-click = reset view.';
+const RECT_HINT = `Drag a rectangle. Shift = add, Alt = subtract. ${VIEW_HINT}`;
+const LASSO_HINT = `Drag a freehand outline. Shift = add, Alt = subtract. ${VIEW_HINT}`;
 
 const SELECTION_FILL = 'rgba(240,160,64,1)';
 
@@ -64,6 +69,16 @@ export class Cropper {
   private mode: CropMode = 'rect';
   private active: ActiveShape | null = null;
 
+  // View transform for ctrl-zoom + space-drag pan. All shape and mask geometry
+  // lives in image-display space; the transform is applied only at draw time
+  // and inverted when reading mouse coords.
+  private viewScale = 1;
+  private viewOffsetX = 0;
+  private viewOffsetY = 0;
+  private spaceDown = false;
+  private panActive = false;
+  private panStart: { mx: number; my: number; ox: number; oy: number } | null = null;
+
   private resolveFn: ((value: HTMLCanvasElement | null) => void) | null = null;
 
   constructor() {
@@ -90,6 +105,15 @@ export class Cropper {
     this.canvas.addEventListener('mousedown', (e) => this.onDown(e));
     window.addEventListener('mousemove', (e) => this.onMove(e));
     window.addEventListener('mouseup', () => this.onUp());
+
+    this.canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
+    this.canvas.addEventListener('dblclick', () => this.resetView());
+    window.addEventListener('keydown', (e) => this.onKeyDown(e));
+    window.addEventListener('keyup', (e) => this.onKeyUp(e));
+  }
+
+  private isOpen(): boolean {
+    return !this.modal.classList.contains('hidden');
   }
 
   /** Open the modal with the given image; resolves with cropped canvas or null on cancel. */
@@ -111,6 +135,7 @@ export class Cropper {
     this.overlayCanvas.height = h;
 
     this.active = null;
+    this.resetView();
     this.setMode('rect');
     this.resetMask(false);
 
@@ -152,6 +177,19 @@ export class Cropper {
 
   private onDown(e: MouseEvent): void {
     if (!this.image) return;
+    if (this.spaceDown) {
+      // Start panning instead of drawing.
+      const c = this.canvasXY(e);
+      this.panActive = true;
+      this.panStart = {
+        mx: c.x,
+        my: c.y,
+        ox: this.viewOffsetX,
+        oy: this.viewOffsetY,
+      };
+      this.canvas.style.cursor = 'grabbing';
+      return;
+    }
     const p = this.localXY(e);
     const op = opFromModifiers(e);
     if (this.mode === 'rect') {
@@ -163,6 +201,13 @@ export class Cropper {
   }
 
   private onMove(e: MouseEvent): void {
+    if (this.panActive && this.panStart) {
+      const c = this.canvasXY(e);
+      this.viewOffsetX = this.panStart.ox + (c.x - this.panStart.mx);
+      this.viewOffsetY = this.panStart.oy + (c.y - this.panStart.my);
+      this.draw();
+      return;
+    }
     if (!this.active) return;
     const p = clampPoint(this.localXY(e), this.canvas.width, this.canvas.height);
     if (this.active.kind === 'rect') {
@@ -178,9 +223,63 @@ export class Cropper {
   }
 
   private onUp(): void {
+    if (this.panActive) {
+      this.panActive = false;
+      this.panStart = null;
+      this.canvas.style.cursor = this.spaceDown ? 'grab' : '';
+      return;
+    }
     if (!this.active) return;
     this.bakeActive();
     this.active = null;
+    this.draw();
+  }
+
+  private onWheel(e: WheelEvent): void {
+    if (!this.image || !e.ctrlKey) return;
+    e.preventDefault();
+    const c = this.canvasXY(e);
+    const oldScale = this.viewScale;
+    const newScale = clamp(
+      e.deltaY < 0 ? oldScale * ZOOM_FACTOR : oldScale / ZOOM_FACTOR,
+      ZOOM_MIN,
+      ZOOM_MAX,
+    );
+    if (newScale === oldScale) return;
+    // Keep the image point under the cursor stationary on screen.
+    const ix = (c.x - this.viewOffsetX) / oldScale;
+    const iy = (c.y - this.viewOffsetY) / oldScale;
+    this.viewScale = newScale;
+    this.viewOffsetX = c.x - ix * newScale;
+    this.viewOffsetY = c.y - iy * newScale;
+    if (newScale === 1) {
+      // Snap pan back to identity when fully zoomed out.
+      this.viewOffsetX = 0;
+      this.viewOffsetY = 0;
+    }
+    this.draw();
+  }
+
+  private onKeyDown(e: KeyboardEvent): void {
+    if (!this.isOpen()) return;
+    if (e.code === 'Space' && !this.spaceDown) {
+      this.spaceDown = true;
+      if (!this.panActive) this.canvas.style.cursor = 'grab';
+      e.preventDefault();
+    }
+  }
+
+  private onKeyUp(e: KeyboardEvent): void {
+    if (e.code === 'Space') {
+      this.spaceDown = false;
+      if (!this.panActive) this.canvas.style.cursor = '';
+    }
+  }
+
+  private resetView(): void {
+    this.viewScale = 1;
+    this.viewOffsetX = 0;
+    this.viewOffsetY = 0;
     this.draw();
   }
 
@@ -226,14 +325,18 @@ export class Cropper {
     if (!this.image) return;
     const { ctx, canvas } = this;
 
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.setTransform(this.viewScale, 0, 0, this.viewScale, this.viewOffsetX, this.viewOffsetY);
     ctx.drawImage(this.image, 0, 0, canvas.width, canvas.height);
 
     // Build a dim-outside-selection overlay: 50% black, with the mask's alpha
     // erased so the selected region shows the underlying image at full brightness.
     const ov = this.overlayCtx;
     ov.save();
+    ov.setTransform(1, 0, 0, 1, 0, 0);
     ov.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
     ov.fillStyle = 'rgba(0,0,0,0.5)';
     ov.fillRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
@@ -243,23 +346,28 @@ export class Cropper {
     ctx.drawImage(this.overlayCanvas, 0, 0);
 
     if (this.active) this.drawActiveOutline();
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 
   private drawActiveOutline(): void {
     if (!this.active) return;
     const { ctx } = this;
     ctx.save();
-    ctx.lineWidth = 1.5;
+    // Keep stroke widths and dash sizes constant in screen pixels regardless of zoom.
+    const w = 1.5 / this.viewScale;
+    const dash = (n: number): number[] => [n / this.viewScale, n / this.viewScale];
+    ctx.lineWidth = w;
     if (this.active.op === 'sub') {
       ctx.strokeStyle = '#c14040';
-      ctx.setLineDash([4, 4]);
+      ctx.setLineDash(dash(4));
     } else {
       ctx.strokeStyle = '#f0a040';
-      ctx.setLineDash(this.active.op === 'add' ? [2, 2] : []);
+      ctx.setLineDash(this.active.op === 'add' ? dash(2) : []);
     }
     if (this.active.kind === 'rect') {
       const r = rectFromPoints(this.active.start, this.active.current);
-      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w, r.h);
+      ctx.strokeRect(r.x, r.y, r.w, r.h);
     } else {
       const pts = this.active.points;
       if (pts.length > 0) {
@@ -357,13 +465,23 @@ export class Cropper {
 
   // -------- Helpers --------
 
-  private localXY(e: MouseEvent): Point {
+  /** Mouse position in raw canvas-pixel coords (no view transform applied). */
+  private canvasXY(e: MouseEvent): Point {
     const rect = this.canvas.getBoundingClientRect();
     const sx = this.canvas.width / rect.width;
     const sy = this.canvas.height / rect.height;
     return {
       x: (e.clientX - rect.left) * sx,
       y: (e.clientY - rect.top) * sy,
+    };
+  }
+
+  /** Mouse position in image-display space (canvas-pixel coords minus view transform). */
+  private localXY(e: MouseEvent): Point {
+    const c = this.canvasXY(e);
+    return {
+      x: (c.x - this.viewOffsetX) / this.viewScale,
+      y: (c.y - this.viewOffsetY) / this.viewScale,
     };
   }
 }
@@ -404,6 +522,10 @@ function clampPoint(p: Point, maxW: number, maxH: number): Point {
     x: Math.max(0, Math.min(p.x, maxW)),
     y: Math.max(0, Math.min(p.y, maxH)),
   };
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, v));
 }
 
 /** Tight bounding box of all pixels with alpha > 0. Returns null if empty. */
