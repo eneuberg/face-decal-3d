@@ -31,6 +31,19 @@ const saveBtn = getRequiredEl<HTMLButtonElement>('save-btn');
 
 const cropper = new Cropper();
 
+// Disable OrbitControls' wheel-zoom while Shift is held so Shift+scroll cleanly
+// resizes the decal instead of zooming the camera. Re-enable on key release or
+// window blur (so it doesn't get stuck off if Shift is released out-of-window).
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Shift') sceneCtx.controls.enableZoom = false;
+});
+window.addEventListener('keyup', (e) => {
+  if (e.key === 'Shift') sceneCtx.controls.enableZoom = true;
+});
+window.addEventListener('blur', () => {
+  sceneCtx.controls.enableZoom = true;
+});
+
 setStepActive(1);
 setStatus('Load a 3D model to begin.');
 
