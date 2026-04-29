@@ -80,14 +80,32 @@ function applyDecal(
   );
   offsetAlongNormals(geometry, SURFACE_OFFSET);
 
-  // alphaTest (not transparent) gives a clean cutout in both the live render
-  // AND the exported glTF: the exporter writes alphaMode='MASK', so transparent
-  // fragments are discarded — no depth write, no blending. Plain transparent
-  // materials export as alphaMode='BLEND', and because glTF has no equivalent
-  // for depthWrite=false the decal then occludes the model wherever its
-  // texture is transparent — that's the "white card over the face" bug.
-  const material = new THREE.MeshBasicMaterial({
+  // We want the decal to look "unlit" — the photo's own colors, no shading
+  // from the scene's lights. MeshBasicMaterial exports as KHR_materials_unlit,
+  // but viewers built on VTK (f3d, ParaView) don't fully support that
+  // extension and fall back to a default white PBR material — the texture
+  // is dropped on the floor.
+  //
+  // Instead: use MeshStandardMaterial (the canonical glTF PBR material) and
+  // route the texture through `emissiveMap`, with `color: black` zeroing the
+  // lit contribution and `emissive: white` driving the visible output. The
+  // base map is still bound for its alpha channel (alphaTest needs it). The
+  // exported glTF uses pbrMetallicRoughness — no extensions, supported
+  // everywhere — and the result is visually identical to unlit.
+  //
+  // alphaTest (not transparent) keeps the clean cutout: the exporter writes
+  // alphaMode='MASK', so transparent fragments are discarded with no depth
+  // write or blending. Plain transparent materials export as 'BLEND' and
+  // since glTF has no equivalent for depthWrite=false, the decal would
+  // occlude the model wherever its texture is transparent — the "white
+  // card over the face" bug.
+  const material = new THREE.MeshStandardMaterial({
     map: state.decalTexture,
+    emissiveMap: state.decalTexture,
+    emissive: new THREE.Color(0xffffff),
+    color: new THREE.Color(0x000000),
+    metalness: 0,
+    roughness: 1,
     alphaTest: 0.5,
     transparent: false,
   });
