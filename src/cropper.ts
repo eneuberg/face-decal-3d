@@ -19,7 +19,13 @@ type ActiveShape =
   | { kind: 'rect'; op: SelectionOp; start: Point; current: Point }
   | { kind: 'lasso'; op: SelectionOp; points: Point[] };
 
-const LASSO_MIN_DIST_SQ = 4 * 4;
+/**
+ * Minimum image-space distance² between consecutive lasso samples. Divided by
+ * `viewScale²` at sample time so the *screen-space* sampling rate stays roughly
+ * constant at any zoom level — at 4× zoom the user still sees a smooth
+ * outline instead of long straight chords between sparse points.
+ */
+const LASSO_MIN_DIST_SQ = 2 * 2;
 const LASSO_MIN_POINTS = 3;
 
 const ZOOM_MIN = 1;
@@ -106,6 +112,14 @@ export class Cropper {
     const octx = this.overlayCanvas.getContext('2d');
     if (!octx) throw new Error('Failed to create overlay context');
     this.overlayCtx = octx;
+
+    // Show raw pixels — no interpolation when the source image is up-/down-
+    // scaled into the display canvas, and no blurry edges on the mask overlay
+    // when zoomed in. Pairs with `image-rendering: pixelated` on the canvas
+    // element itself, which handles the final canvas → screen scale step.
+    this.ctx.imageSmoothingEnabled = false;
+    this.maskCtx.imageSmoothingEnabled = false;
+    this.overlayCtx.imageSmoothingEnabled = false;
 
     this.confirmBtn.addEventListener('click', () => this.confirm());
     this.cancelBtn.addEventListener('click', () => this.cancel());
@@ -230,7 +244,8 @@ export class Cropper {
     } else {
       const pts = this.active.points;
       const last = pts[pts.length - 1];
-      if (!last || (p.x - last.x) ** 2 + (p.y - last.y) ** 2 >= LASSO_MIN_DIST_SQ) {
+      const minDistSq = LASSO_MIN_DIST_SQ / (this.viewScale * this.viewScale);
+      if (!last || (p.x - last.x) ** 2 + (p.y - last.y) ** 2 >= minDistSq) {
         pts.push(p);
       }
     }

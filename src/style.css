@@ -318,6 +318,7 @@ button.primary:hover:not(:disabled) {
   cursor: crosshair;
   max-width: 80vw;
   max-height: 70vh;
+  image-rendering: pixelated;
 }
 
 .crop-actions {
