@@ -26,7 +26,15 @@ const ZOOM_MIN = 1;
 const ZOOM_MAX = 8;
 const ZOOM_FACTOR = 1.15;
 
-const VIEW_HINT = 'Ctrl+scroll = zoom, Space+drag = pan, double-click = reset view.';
+const MAX_UNDO = 10;
+/** Threshold above which a mask pixel is considered selected when packing for undo. */
+const ALPHA_THRESHOLD = 127;
+/** Mask fill color when restoring from a packed snapshot — must match SELECTION_FILL. */
+const FILL_R = 240;
+const FILL_G = 160;
+const FILL_B = 64;
+
+const VIEW_HINT = 'Ctrl+scroll = zoom, Space+drag = pan, dbl-click = reset view, Ctrl+Z = undo.';
 const RECT_HINT = `Drag a rectangle. Shift = add, Alt = subtract. ${VIEW_HINT}`;
 const LASSO_HINT = `Drag a freehand outline. Shift = add, Alt = subtract. ${VIEW_HINT}`;
 
@@ -79,6 +87,9 @@ export class Cropper {
   private panActive = false;
   private panStart: { mx: number; my: number; ox: number; oy: number } | null = null;
 
+  /** Packed 1-bit-per-pixel snapshots of the mask, oldest first. */
+  private undoStack: Uint8Array[] = [];
+
   private resolveFn: ((value: HTMLCanvasElement | null) => void) | null = null;
 
   constructor() {
@@ -100,7 +111,10 @@ export class Cropper {
     this.cancelBtn.addEventListener('click', () => this.cancel());
     this.rectModeBtn.addEventListener('click', () => this.setMode('rect'));
     this.lassoModeBtn.addEventListener('click', () => this.setMode('lasso'));
-    this.resetBtn.addEventListener('click', () => this.resetMask(true));
+    this.resetBtn.addEventListener('click', () => {
+      this.pushUndo();
+      this.resetMask(true);
+    });
 
     this.canvas.addEventListener('mousedown', (e) => this.onDown(e));
     window.addEventListener('mousemove', (e) => this.onMove(e));
@@ -135,6 +149,7 @@ export class Cropper {
     this.overlayCanvas.height = h;
 
     this.active = null;
+    this.undoStack = [];
     this.resetView();
     this.setMode('rect');
     this.resetMask(false);
@@ -230,6 +245,7 @@ export class Cropper {
       return;
     }
     if (!this.active) return;
+    this.pushUndo();
     this.bakeActive();
     this.active = null;
     this.draw();
@@ -266,6 +282,11 @@ export class Cropper {
       this.spaceDown = true;
       if (!this.panActive) this.canvas.style.cursor = 'grab';
       e.preventDefault();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+      this.undo();
+      e.preventDefault();
     }
   }
 
@@ -274,6 +295,60 @@ export class Cropper {
       this.spaceDown = false;
       if (!this.panActive) this.canvas.style.cursor = '';
     }
+  }
+
+  // -------- Undo --------
+
+  private pushUndo(): void {
+    this.undoStack.push(this.encodeMask());
+    if (this.undoStack.length > MAX_UNDO) this.undoStack.shift();
+  }
+
+  private undo(): void {
+    const prev = this.undoStack.pop();
+    if (!prev) return;
+    this.decodeMask(prev);
+    this.active = null;
+    this.draw();
+  }
+
+  /** Pack the mask's alpha channel as 1 bit per pixel. */
+  private encodeMask(): Uint8Array {
+    const w = this.maskCanvas.width;
+    const h = this.maskCanvas.height;
+    const data = this.maskCtx.getImageData(0, 0, w, h).data;
+    const total = w * h;
+    const bytes = new Uint8Array((total + 7) >> 3);
+    for (let i = 0; i < total; i++) {
+      const alpha = data[i * 4 + 3] ?? 0;
+      if (alpha > ALPHA_THRESHOLD) {
+        const byteIdx = i >> 3;
+        const bit = 1 << (i & 7);
+        bytes[byteIdx] = (bytes[byteIdx] ?? 0) | bit;
+      }
+    }
+    return bytes;
+  }
+
+  /** Restore the mask canvas from a packed snapshot. */
+  private decodeMask(bytes: Uint8Array): void {
+    const w = this.maskCanvas.width;
+    const h = this.maskCanvas.height;
+    const img = this.maskCtx.createImageData(w, h);
+    const px = img.data;
+    const total = w * h;
+    for (let i = 0; i < total; i++) {
+      const byte = bytes[i >> 3] ?? 0;
+      const bit = (byte >> (i & 7)) & 1;
+      if (bit) {
+        const o = i * 4;
+        px[o] = FILL_R;
+        px[o + 1] = FILL_G;
+        px[o + 2] = FILL_B;
+        px[o + 3] = 255;
+      }
+    }
+    this.maskCtx.putImageData(img, 0, 0);
   }
 
   private resetView(): void {

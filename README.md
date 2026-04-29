@@ -7,7 +7,7 @@ Built with **Vite + TypeScript (strict)** and **Three.js** (`DecalGeometry`, `GL
 ## What it does
 
 1. Load a `.glb` / `.gltf` head scan
-2. Upload a face photo (`.png` / `.jpg` / `.webp`) and crop it — drag a **rectangle** or **lasso**; hold **Shift** to add to the selection or **Alt** to subtract. Pixels outside the final selection become transparent. **Ctrl + scroll** zooms the image (toward the cursor), **Space + drag** pans, double-click resets. **Re-crop Image** in step 4 reopens the modal on the original upload so you can iterate without re-projecting.
+2. Upload a face photo (`.png` / `.jpg` / `.webp`) and crop it — drag a **rectangle** or **lasso**; hold **Shift** to add to the selection or **Alt** to subtract; **Ctrl+Z** undoes the last selection step (up to 10). Pixels outside the final selection become transparent. **Ctrl + scroll** zooms toward the cursor, **Space + drag** pans, double-click resets the view. **Re-crop Image** in step 4 reopens the modal on the original upload so you can iterate without re-projecting.
 3. Click on the model — the cropped image is projected onto the surface from the current camera angle as a `DecalGeometry` mesh
 4. Adjust the size with the slider or **Shift + scroll** for live re-projection (Photoshop-brush style); two extra **Stretch X / Stretch Y** sliders scale the decal independently along the camera-aligned axes
 5. Save the combined model + decal as a single binary GLB
