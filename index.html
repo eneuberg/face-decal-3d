@@ -89,7 +89,10 @@
               />
               <span id="stretch-y-value">1.00</span>
             </div>
-            <button id="redo-projection" disabled>Redo Projection</button>
+            <div class="button-stack">
+              <button id="recrop-btn" disabled>Re-crop Image</button>
+              <button id="redo-projection" disabled>Redo Projection</button>
+            </div>
           </div>
         </section>
 
@@ -112,7 +115,8 @@
         <div class="crop-toolbar">
           <button id="crop-mode-rect" class="mode active">Rectangle</button>
           <button id="crop-mode-lasso" class="mode">Lasso</button>
-          <span class="crop-hint" id="crop-hint">Drag corners to resize, drag inside to move.</span>
+          <button id="crop-reset" class="mode">Reset</button>
+          <span class="crop-hint" id="crop-hint">Drag to draw a rectangle. Shift = add, Alt = subtract.</span>
         </div>
         <div class="crop-stage">
           <canvas id="crop-canvas"></canvas>

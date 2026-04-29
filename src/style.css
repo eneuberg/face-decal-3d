@@ -294,6 +294,12 @@ button.primary:hover:not(:disabled) {
   justify-content: flex-end;
 }
 
+.button-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .crop-toolbar {
   display: flex;
   gap: 8px;

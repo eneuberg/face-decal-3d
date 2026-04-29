@@ -15,6 +15,8 @@ export interface AppState {
   model: LoadedModel | null;
   /** Original filename of the loaded model, used to derive the export name. */
   modelFilename: string | null;
+  /** The original uploaded image File, kept around so the user can re-crop without re-uploading. */
+  originalImageFile: File | null;
   decalTexture: THREE.CanvasTexture | null;
   decalMesh: THREE.Mesh | null;
   decalPlacement: DecalPlacement | null;
@@ -30,6 +32,7 @@ export function createInitialState(): AppState {
   return {
     model: null,
     modelFilename: null,
+    originalImageFile: null,
     decalTexture: null,
     decalMesh: null,
     decalPlacement: null,

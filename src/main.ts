@@ -26,6 +26,7 @@ const stretchXSlider = getRequiredEl<HTMLInputElement>('stretch-x-slider');
 const stretchXValue = getRequiredEl<HTMLSpanElement>('stretch-x-value');
 const stretchYSlider = getRequiredEl<HTMLInputElement>('stretch-y-slider');
 const stretchYValue = getRequiredEl<HTMLSpanElement>('stretch-y-value');
+const recropBtn = getRequiredEl<HTMLButtonElement>('recrop-btn');
 const redoBtn = getRequiredEl<HTMLButtonElement>('redo-projection');
 const saveBtn = getRequiredEl<HTMLButtonElement>('save-btn');
 
@@ -71,30 +72,17 @@ modelInput.addEventListener('change', async () => {
 imageInput.addEventListener('change', async () => {
   const file = imageInput.files?.[0];
   if (!file) return;
+  state.originalImageFile = file;
   try {
     setStepActive(3);
     setStatus('Crop the image, then click Confirm Crop.');
     const cropped = await cropper.open(file);
     if (!cropped) {
       setStatus('Crop cancelled.', 'warn');
-      setStepActive(state.model ? 2 : 1);
+      setStepActive(state.model ? (state.decalTexture ? 4 : 2) : 1);
       return;
     }
-    if (state.decalTexture) state.decalTexture.dispose();
-    const tex = new THREE.CanvasTexture(cropped);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.needsUpdate = true;
-    state.decalTexture = tex;
-
-    // If there is already a placed decal, swap its texture in place.
-    if (state.decalMesh) {
-      const mat = state.decalMesh.material;
-      if (!Array.isArray(mat) && 'map' in mat) {
-        (mat as THREE.MeshBasicMaterial).map = tex;
-        (mat as THREE.MeshBasicMaterial).needsUpdate = true;
-      }
-    }
-
+    applyCroppedTexture(cropped);
     setStepActive(state.model ? 4 : 1);
     setStatus(
       state.model
@@ -102,13 +90,47 @@ imageInput.addEventListener('change', async () => {
         : 'Image cropped. Load a model to place it.',
     );
     updateButtons();
-    // Reset file input so re-selecting the same file fires "change" again.
     imageInput.value = '';
   } catch (err) {
     console.error(err);
     setStatus(`Failed to crop image: ${(err as Error).message}`, 'error');
   }
 });
+
+recropBtn.addEventListener('click', async () => {
+  if (!state.originalImageFile) return;
+  try {
+    setStatus('Re-crop and confirm to update the decal.');
+    const cropped = await cropper.open(state.originalImageFile);
+    if (!cropped) {
+      setStatus('Re-crop cancelled.', 'warn');
+      return;
+    }
+    applyCroppedTexture(cropped);
+    rebuildDecal(state, sceneCtx.modelGroup);
+    setStatus('Decal texture updated.');
+  } catch (err) {
+    console.error(err);
+    setStatus(`Failed to re-crop image: ${(err as Error).message}`, 'error');
+  }
+});
+
+function applyCroppedTexture(cropped: HTMLCanvasElement): void {
+  if (state.decalTexture) state.decalTexture.dispose();
+  const tex = new THREE.CanvasTexture(cropped);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  state.decalTexture = tex;
+
+  // Swap the texture on the live decal so the preview updates without re-projecting.
+  if (state.decalMesh) {
+    const mat = state.decalMesh.material;
+    if (!Array.isArray(mat) && 'map' in mat) {
+      mat.map = tex;
+      mat.needsUpdate = true;
+    }
+  }
+}
 
 // Click on viewport canvas → place decal.
 sceneCtx.renderer.domElement.addEventListener('click', (e) => {
@@ -217,6 +239,7 @@ function setStretchY(v: number): void {
 function updateButtons(): void {
   saveBtn.disabled = !state.model;
   redoBtn.disabled = !state.decalMesh;
+  recropBtn.disabled = !state.originalImageFile;
 }
 
 function pointerToNDC(
