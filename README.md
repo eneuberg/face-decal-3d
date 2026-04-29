@@ -71,12 +71,22 @@ Planned (not yet implemented):
 - **Brightness & saturation sliders.** Color-correct the decal image after cropping. Either CSS-style filter on a working canvas or pixel-wise transform; result is rebaked into the `CanvasTexture` so the live decal updates.
 - **Magic skin selection.** A one-click selection that captures skin *and everything inside the skin region* (eyes, mouth, teeth, etc.) — i.e. the head/face mask, with hair and clothing acting as the outer separator. Likely a face-segmentation model (MediaPipe / BodyPix style) producing an alpha mask combined with the existing add/subtract refinement.
 - **Flat sticker mode (no surface conform).** A checkbox to opt out of `DecalGeometry` projection: instead, place a flat textured plane on the model surface, anchored at the raycast hit point and oriented to face the camera. Useful when the surface is too irregular for the projection to look clean.
+- **Press-and-rotate placement workflow.** Replace the click-to-place model with a press / drag / release gesture that lets you orient the decal in place before committing:
+  - **Ctrl + mouse-down** raycasts onto the model and spawns a decal (projected, or a flat sticker if flat-sticker mode is enabled) facing the camera at the hit point.
+  - **While the button is held**, dragging the mouse rotates the decal *in its own reference frame* — horizontal drag spins around the surface-normal-aligned Y axis, vertical drag tilts around the Z axis (nudging the decal forward/backward in its own frame).
+  - **Holding R** while dragging swaps the active rotation to the third axis (in-plane 2D rotation around the projection normal), so all three axes are reachable from the same gesture.
+  - **Releasing the button** commits the orientation. Decal stays where it is.
+  - **Plain drag (no Ctrl) on an existing decal** re-enters the same rotation gesture against the already-placed decal — same R-toggle, same reference frame — so you can keep tweaking without re-projecting.
+  - **Ctrl + click again** discards the current orientation and re-projects fresh from the new camera angle / hit point.
+
+  See [`docs/press-rotate-workflow.md`](docs/press-rotate-workflow.md) for the implementation sketch.
 
 Smaller cleanups (also `TODO`s in `src/decal.ts`):
 
 - Multiple decals at once with selection / deletion
 - Bake the decal into the base UV texture and export as a single-material mesh
 - Rotation handle to spin the decal around the surface normal
+- **Alpha retouch brush.** Small brush tool to paint transparency directly onto the projected decal texture, so ugly fringes / smeared edges from the projection can be erased without re-cropping the source image. Operates on the live `CanvasTexture` alpha channel; size + hardness sliders, undo stack.
 
 ## License
 
