@@ -184,8 +184,16 @@
           <div class="step-num">07</div>
           <div class="step-body">
             <h2>Save</h2>
-            <p class="hint">Exports a GLB scaled so 1&nbsp;unit&nbsp;=&nbsp;1&nbsp;mm (slicer-friendly).</p>
-            <button id="save-btn" disabled>Save GLB</button>
+            <p class="hint">Exports scaled so 1&nbsp;unit&nbsp;=&nbsp;1&nbsp;mm (slicer-friendly). STL drops the decal (mesh-only format).</p>
+            <div class="size-row">
+              <label for="format-select">Format</label>
+              <select id="format-select">
+                <option value="glb" selected>GLB (with decal)</option>
+                <option value="stl">STL (mesh only)</option>
+              </select>
+              <span></span>
+            </div>
+            <button id="save-btn" disabled>Save</button>
           </div>
         </section>
 

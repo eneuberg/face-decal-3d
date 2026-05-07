@@ -3,7 +3,7 @@ import './style.css';
 import { Cropper } from './cropper';
 import { CutController } from './cut';
 import { clearDecal, placeDecalAtPointer, rebuildDecal } from './decal';
-import { exportGLB, type ExportOptions } from './exporter';
+import { exportModel, type ExportFormat, type ExportOptions } from './exporter';
 import {
   KEYCHAIN_DEFAULTS,
   createKeychainMesh,
@@ -62,6 +62,7 @@ const keychainZValue = getRequiredEl<HTMLSpanElement>('keychain-z-value');
 const keychainSnapBottomBtn = getRequiredEl<HTMLButtonElement>('keychain-snap-bottom-btn');
 const keychainSnapTopBtn = getRequiredEl<HTMLButtonElement>('keychain-snap-top-btn');
 const keychainSnapCutBtn = getRequiredEl<HTMLButtonElement>('keychain-snap-cut-btn');
+const formatSelect = getRequiredEl<HTMLSelectElement>('format-select');
 
 // --- Subsystems ---
 const cropper = new Cropper();
@@ -514,10 +515,12 @@ function refreshKeychainGeometry(): void {
 // =====================================================================
 saveBtn.addEventListener('click', async () => {
   if (!state.model) return;
-  const filename = buildExportFilename(state.modelFilename);
+  const format = formatSelect.value as ExportFormat;
+  const filename = buildExportFilename(state.modelFilename, format);
   setStatus(`Exporting ${filename}…`);
   try {
     const opts: ExportOptions = {
+      format,
       cut: state.cutEnabled ? { worldY: state.cutWorldY } : null,
       keychain:
         state.keychainEnabled && keychainMesh
@@ -528,22 +531,23 @@ saveBtn.addEventListener('click', async () => {
           : null,
       scale: { worldPerMM: worldPerMM() },
     };
-    await exportGLB(state.model, state.decalMesh, filename, opts);
+    await exportModel(state.model, state.decalMesh, filename, opts);
     setStatus(`Saved ${filename}`);
   } catch (err) {
     console.error(err);
-    setStatus(`Failed to save GLB: ${(err as Error).message}`, 'error');
+    setStatus(`Failed to save: ${(err as Error).message}`, 'error');
   }
 });
 
-function buildExportFilename(modelFilename: string | null): string {
+function buildExportFilename(modelFilename: string | null, format: ExportFormat): string {
   const stem = modelFilename ? modelFilename.replace(/\.(glb|gltf)$/i, '') : 'model';
   const tags: string[] = [];
-  if (state.decalMesh) tags.push('decal');
+  // STL drops the decal, so don't tag it as having one.
+  if (format === 'glb' && state.decalMesh) tags.push('decal');
   if (state.cutEnabled) tags.push('cut');
   if (state.keychainEnabled) tags.push('keychain');
   const suffix = tags.length ? `_${tags.join('_')}` : '';
-  return `${stem}${suffix}.glb`;
+  return `${stem}${suffix}.${format}`;
 }
 
 // =====================================================================
