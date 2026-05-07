@@ -27,6 +27,9 @@ export function createScene(container: HTMLElement): SceneContext {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(container.clientWidth, container.clientHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  // Per-material clipping planes (used by the cut-preview to hide the
+  // bottom half of the model while keeping the top crisp).
+  renderer.localClippingEnabled = true;
   container.appendChild(renderer.domElement);
 
   const controls = new OrbitControls(camera, renderer.domElement);
