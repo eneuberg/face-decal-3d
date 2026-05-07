@@ -59,8 +59,9 @@ const keychainZSlider = getRequiredEl<HTMLInputElement>('keychain-z-slider');
 const keychainXValue = getRequiredEl<HTMLSpanElement>('keychain-x-value');
 const keychainYValue = getRequiredEl<HTMLSpanElement>('keychain-y-value');
 const keychainZValue = getRequiredEl<HTMLSpanElement>('keychain-z-value');
-const keychainResetBtn = getRequiredEl<HTMLButtonElement>('keychain-reset-btn');
-const keychainSnapBtn = getRequiredEl<HTMLButtonElement>('keychain-snap-cut-btn');
+const keychainSnapBottomBtn = getRequiredEl<HTMLButtonElement>('keychain-snap-bottom-btn');
+const keychainSnapTopBtn = getRequiredEl<HTMLButtonElement>('keychain-snap-top-btn');
+const keychainSnapCutBtn = getRequiredEl<HTMLButtonElement>('keychain-snap-cut-btn');
 
 // --- Subsystems ---
 const cropper = new Cropper();
@@ -384,19 +385,24 @@ keychainXSlider.addEventListener('input', () => updateKeychainFromSliders());
 keychainYSlider.addEventListener('input', () => updateKeychainFromSliders());
 keychainZSlider.addEventListener('input', () => updateKeychainFromSliders());
 
-keychainResetBtn.addEventListener('click', () => {
-  if (!state.modelBBox) return;
-  initKeychainPosForModel();
-  syncKeychainSlidersFromState();
-  if (keychainMesh) keychainMesh.position.copy(state.keychainPosWorld);
-});
+keychainSnapBottomBtn.addEventListener('click', () => snapKeychainCenteredTo('bottom'));
+keychainSnapTopBtn.addEventListener('click', () => snapKeychainCenteredTo('top'));
 
-keychainSnapBtn.addEventListener('click', () => {
+keychainSnapCutBtn.addEventListener('click', () => {
   if (!state.cutEnabled) return;
   state.keychainPosWorld.y = state.cutWorldY;
   syncKeychainSlidersFromState();
   if (keychainMesh) keychainMesh.position.copy(state.keychainPosWorld);
 });
+
+function snapKeychainCenteredTo(edge: 'bottom' | 'top'): void {
+  if (!state.modelBBox) return;
+  const center = state.modelBBox.getCenter(new THREE.Vector3());
+  const y = edge === 'bottom' ? state.modelBBox.min.y : state.modelBBox.max.y;
+  state.keychainPosWorld.set(center.x, y, center.z);
+  syncKeychainSlidersFromState();
+  if (keychainMesh) keychainMesh.position.copy(state.keychainPosWorld);
+}
 
 function initKeychainPosForModel(): void {
   if (!state.modelBBox) return;
@@ -478,11 +484,12 @@ function setKeychainSlidersDisabled(disabled: boolean): void {
   keychainXSlider.disabled = disabled;
   keychainYSlider.disabled = disabled;
   keychainZSlider.disabled = disabled;
-  keychainResetBtn.disabled = disabled;
+  keychainSnapBottomBtn.disabled = disabled;
+  keychainSnapTopBtn.disabled = disabled;
 }
 
 function updateKeychainSnapAvailability(): void {
-  keychainSnapBtn.disabled = !(state.keychainEnabled && state.cutEnabled);
+  keychainSnapCutBtn.disabled = !(state.keychainEnabled && state.cutEnabled);
 }
 
 function removeKeychain(): void {
