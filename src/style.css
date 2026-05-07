@@ -151,6 +151,44 @@ kbd {
   text-align: right;
 }
 
+.size-row span.unit {
+  color: var(--text-dim);
+}
+
+.size-row input[type='number'],
+.size-row select {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 5px 6px;
+  background: #0e0e0e;
+  color: var(--text);
+  border: 1px solid var(--border);
+  outline: none;
+  width: 100%;
+}
+
+.size-row input[type='number']:focus,
+.size-row select:focus {
+  border-color: var(--accent);
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 10px 0;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.check-row input[type='checkbox'] {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
 input[type='range'] {
   -webkit-appearance: none;
   appearance: none;

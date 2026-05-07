@@ -31,10 +31,32 @@
         <section class="step" data-step="2">
           <div class="step-num">02</div>
           <div class="step-body">
-            <h2>Upload Decal Image</h2>
-            <label class="file-input">
-              <span>Choose .png / .jpg / .webp</span>
-              <input type="file" id="image-input" accept=".png,.jpg,.jpeg,.webp" />
+            <h2>Physical Size</h2>
+            <p class="hint">Sets the print size and the keychain ring scale (10&nbsp;mm inner&nbsp;Ø).</p>
+            <div class="size-row">
+              <label for="phys-size-input">Size</label>
+              <input
+                type="number"
+                id="phys-size-input"
+                min="5"
+                max="500"
+                step="1"
+                value="60"
+              />
+              <span class="unit">mm</span>
+            </div>
+            <div class="size-row">
+              <label for="phys-axis-select">Along</label>
+              <select id="phys-axis-select">
+                <option value="y" selected>Y (height)</option>
+                <option value="x">X (width)</option>
+                <option value="z">Z (depth)</option>
+              </select>
+              <span></span>
+            </div>
+            <label class="check-row">
+              <input type="checkbox" id="ruler-toggle" checked />
+              <span>Show ruler</span>
             </label>
           </div>
         </section>
@@ -42,7 +64,11 @@
         <section class="step" data-step="3">
           <div class="step-num">03</div>
           <div class="step-body">
-            <h2>Crop</h2>
+            <h2>Decal Image (optional)</h2>
+            <label class="file-input">
+              <span>Choose .png / .jpg / .webp</span>
+              <input type="file" id="image-input" accept=".png,.jpg,.jpeg,.webp" />
+            </label>
             <p class="hint">Crop overlay opens after upload.</p>
           </div>
         </section>
@@ -51,8 +77,7 @@
           <div class="step-num">04</div>
           <div class="step-body">
             <h2>Place Decal</h2>
-            <p class="hint">Click on the model to project. Click again to move.</p>
-            <p class="hint">Hold <kbd>Shift</kbd> + scroll to resize.</p>
+            <p class="hint">Ctrl+click on the model to project. Hold <kbd>Shift</kbd>+scroll to resize.</p>
             <div class="size-row">
               <label for="size-slider">Size</label>
               <input
@@ -99,7 +124,66 @@
         <section class="step" data-step="5">
           <div class="step-num">05</div>
           <div class="step-body">
+            <h2>Cut Bottom (optional)</h2>
+            <label class="check-row">
+              <input type="checkbox" id="cut-toggle" />
+              <span>Trim below the red plane on export</span>
+            </label>
+            <div class="size-row">
+              <label for="cut-slider">Height</label>
+              <input
+                type="range"
+                id="cut-slider"
+                min="0"
+                max="1"
+                step="0.001"
+                value="0.25"
+                disabled
+              />
+              <span id="cut-value">—</span>
+            </div>
+            <div class="button-stack">
+              <button id="cut-reset-btn" disabled>Reset to 25 %</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="step" data-step="6">
+          <div class="step-num">06</div>
+          <div class="step-body">
+            <h2>Keychain Loop (optional)</h2>
+            <p class="hint">Half-torus, 10&nbsp;mm inner&nbsp;Ø, 3&nbsp;mm wall. D-shape faces the camera.</p>
+            <label class="check-row">
+              <input type="checkbox" id="keychain-toggle" disabled />
+              <span>Attach keychain ring</span>
+            </label>
+            <div class="size-row">
+              <label for="keychain-x-slider">X</label>
+              <input type="range" id="keychain-x-slider" min="-1" max="1" step="0.001" value="0" disabled />
+              <span id="keychain-x-value">—</span>
+            </div>
+            <div class="size-row">
+              <label for="keychain-y-slider">Y</label>
+              <input type="range" id="keychain-y-slider" min="-1" max="1" step="0.001" value="0" disabled />
+              <span id="keychain-y-value">—</span>
+            </div>
+            <div class="size-row">
+              <label for="keychain-z-slider">Z</label>
+              <input type="range" id="keychain-z-slider" min="-1" max="1" step="0.001" value="0" disabled />
+              <span id="keychain-z-value">—</span>
+            </div>
+            <div class="button-stack">
+              <button id="keychain-reset-btn" disabled>Reset to bottom-center</button>
+              <button id="keychain-snap-cut-btn" disabled>Snap Y to cut plane</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="step" data-step="7">
+          <div class="step-num">07</div>
+          <div class="step-body">
             <h2>Save</h2>
+            <p class="hint">Exports a GLB scaled so 1&nbsp;unit&nbsp;=&nbsp;1&nbsp;mm (slicer-friendly).</p>
             <button id="save-btn" disabled>Save GLB</button>
           </div>
         </section>
@@ -110,8 +194,8 @@
       <main id="viewport">
         <aside id="viewport-controls-hint" aria-label="Viewport controls">
           <dl>
-            <dt>Ctrl + click</dt><dd>place / re-project</dd>
-            <dt>Ctrl + Z</dt><dd>undo last position</dd>
+            <dt>Ctrl + click</dt><dd>place / re-project decal</dd>
+            <dt>Ctrl + Z</dt><dd>undo decal position</dd>
             <dt>Shift + scroll</dt><dd>resize decal</dd>
             <dt>Drag</dt><dd>orbit</dd>
             <dt>Right-drag</dt><dd>pan</dd>
